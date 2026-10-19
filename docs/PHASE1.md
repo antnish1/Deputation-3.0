@@ -50,3 +50,8 @@ The ten branch sheets contain up to 27 columns A:AA. Daily status stores date, e
 - Migration 004's HO reopening RPC relies on function-owner privileges and trigger checks. It is **NOT APPROVED FOR APPLICATION** until tested under real Auth roles, including forged API calls, denied direct updates and audit preservation. Do not apply these draft migrations as-is simply because frontend CI passes.
 - Formal consolidation is a query over submitted engineer-days; no daily duplicate-copy table is required. Automated regression cases exercise branch filtering, exclusion of drafts and leave without service jobs.
 - Next release gates: audit and harden migrations, exercise RLS and RPC in a disposable environment, import a verified engineer roster, reconcile workbook attendance formulas, configure publishable key, and complete user-acceptance testing.
+
+## Correction safety update
+- Migration 004 now only approves or rejects correction requests; it **does not** reopen submitted deputation or change immutable daily records.
+- Approved requests require a future versioned amendment workflow before corrections can be applied. No migration was executed.
+- SQL/RLS integration tests remain required before applying migrations to the connected project.
