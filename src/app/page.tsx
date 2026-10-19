@@ -14,12 +14,20 @@ export default function Home(){
  const load=useCallback(async()=>{
  if(!supabase)return;
  const monthEnd=month+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()).padStart(2,'0');
- const [user,br,en,ds,js]=await Promise.all([supabase.auth.getUser(),supabase.from('branches').select('*').order('name'),supabase.from('engineers').select('*').eq('active',true).order('name'),supabase.from('daily_status').select('*').gte('work_date',month+'-01').lte('work_date',monthEnd).order('work_date',{ascending:false}),supabase.from('service_jobs').select('*').gte('work_date',month+'-01').lte('work_date',monthEnd)]);
+ const [user,br]=await Promise.all([supabase.auth.getUser(),supabase.from('branches').select('*').order('name')]);
  if(!user.data.user){setAuth(false);return}setAuth(true);
  const p=await supabase.from('profiles').select('id,display_name,role').eq('id',user.data.user.id).single();
  if(p.error){notify('Your account is not provisioned for this application.');setProfile(null);}else setProfile(p.data as Profile);
- for(const r of [br,en,ds,js])if(r.error){notify(r.error.message);return}
- setBranches(br.data as Branch[]);setEngineers(en.data as Engineer[]);setDays(ds.data as Day[]);setJobs(js.data as Job[]);
+ if(br.error){notify(br.error.message);return}
+ async function pages<T>(fetchPage:(start:number,end:number)=>PromiseLike<{data:T[]|null;error:{message:string}|null}>):Promise<T[]>{const all:T[]=[];for(let start=0;start<100000;start+=500){const page=await fetchPage(start,start+499);if(page.error)throw new Error(page.error.message);const list=page.data||[];all.push(...list);if(list.length<500)return all;}throw new Error('Result exceeds the 100,000-record safety limit');}
+ try{
+ const [en,ds,js]=await Promise.all([
+ pages<Engineer>((start,end)=>supabase.from('engineers').select('*').eq('active',true).order('id').range(start,end)),
+ pages<Day>((start,end)=>supabase.from('daily_status').select('*').gte('work_date',month+'-01').lte('work_date',monthEnd).order('id').range(start,end)),
+ pages<Job>((start,end)=>supabase.from('service_jobs').select('*').gte('work_date',month+'-01').lte('work_date',monthEnd).order('id').range(start,end))
+ ]);
+ setBranches(br.data as Branch[]);setEngineers(en);setDays(ds);setJobs(js);
+ }catch(e){notify(errorMessage(e));}
  },[supabase,month]);
  useEffect(()=>{if(!supabase)return;void load();const {data}=supabase.auth.onAuthStateChange(()=>{void load()});return()=>data.subscription.unsubscribe()},[supabase,load]);
  const branchName=(id:string)=>branches.find(b=>b.id===id)?.name||'Unknown branch';
