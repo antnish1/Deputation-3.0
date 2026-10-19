@@ -13,7 +13,8 @@ export default function Home(){
  const notify=(msg:string)=>setNotice(msg);
  const load=useCallback(async()=>{
  if(!supabase)return;
- const [user,br,en,ds,js]=await Promise.all([supabase.auth.getUser(),supabase.from('branches').select('*').order('name'),supabase.from('engineers').select('*').eq('active',true).order('name'),supabase.from('daily_status').select('*').gte('work_date',month+'-01').lte('work_date',month+'-31').order('work_date',{ascending:false}),supabase.from('service_jobs').select('*').gte('work_date',month+'-01').lte('work_date',month+'-31')]);
+ const monthEnd=month+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()).padStart(2,'0');
+ const [user,br,en,ds,js]=await Promise.all([supabase.auth.getUser(),supabase.from('branches').select('*').order('name'),supabase.from('engineers').select('*').eq('active',true).order('name'),supabase.from('daily_status').select('*').gte('work_date',month+'-01').lte('work_date',monthEnd).order('work_date',{ascending:false}),supabase.from('service_jobs').select('*').gte('work_date',month+'-01').lte('work_date',monthEnd)]);
  if(!user.data.user){setAuth(false);return}setAuth(true);
  const p=await supabase.from('profiles').select('id,display_name,role').eq('id',user.data.user.id).single();
  if(p.error){notify('Your account is not provisioned for this application.');setProfile(null);}else setProfile(p.data as Profile);
