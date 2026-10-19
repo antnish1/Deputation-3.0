@@ -36,4 +36,4 @@ The ten branch sheets contain up to 27 columns A:AA. Daily status stores date, e
 - Migrations 002 and 003 add transactional roster writes, correction request record, and integrity triggers.
 - **Not yet implemented:** HO review/approval of correction requests, re-opening and versioned adjustment records, final paid days, automatic holidays, cross-branch deputation, historical data import, and reconciliation.
 - **Release blocker:** RLS and SQL migrations have not been tested on an isolated database; no live database connection has been configured. Browser-only tests and CI builds cannot prove RLS behavior.
-- **Release blocker:** Some Supabase queries use default pagination and will not capture very large monthly data sets without server-side pagination. Do not treat attendance totals as complete in a live dataset until this is resolved.
+- Supabase monthly queries now paginate in 500-row batches with a 100,000-row safety limit; validation with actual production-scale data remains necessary.
