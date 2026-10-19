@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "outDir": "dist-test",
+    "rootDir": "src/lib",
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/lib/attendance.ts",
+    "src/lib/types.ts",
+    "src/lib/consolidation.ts"
+  ]
+}
