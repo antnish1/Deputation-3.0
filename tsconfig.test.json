@@ -10,6 +10,7 @@
   },
   "include": [
     "src/lib/attendance.ts",
-    "src/lib/types.ts"
+    "src/lib/types.ts",
+    "src/lib/consolidation.ts"
   ]
 }
