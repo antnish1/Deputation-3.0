@@ -26,3 +26,14 @@ The ten branch sheets contain up to 27 columns A:AA. Daily status stores date, e
 - Unique engineer employee code, unique branches, service-job/date consistency, lock after submission, audit history.
 - Postgres RLS prevents cross-branch reading/writing; UI filters supplement security but do not replace it.
 - In any import, preserve source spreadsheet/sheet/row in separate staging tables and deduplicate prior to final insert.
+
+## Incremental milestone (October 19, 2026)
+- Branch roster: select statuses for multiple active engineers; save selection as one SQL transaction. No default presence assumptions.
+- Consolidation: separate status table for leave/absence without service activity.
+- Attendance: provisional month grid, days 1 through final calendar day, with missing marked unrecorded.
+- Submission completeness: home-branch engineer count compared with entered and submitted engineer-day rows.
+- Correction requests: submitted entries can be flagged with a reason; the original stays locked.
+- Migrations 002 and 003 add transactional roster writes, correction request record, and integrity triggers.
+- **Not yet implemented:** HO review/approval of correction requests, re-opening and versioned adjustment records, final paid days, automatic holidays, cross-branch deputation, historical data import, and reconciliation.
+- **Release blocker:** RLS and SQL migrations have not been tested on an isolated database; no live database connection has been configured. Browser-only tests and CI builds cannot prove RLS behavior.
+- **Release blocker:** Some Supabase queries use default pagination and will not capture very large monthly data sets without server-side pagination. Do not treat attendance totals as complete in a live dataset until this is resolved.
