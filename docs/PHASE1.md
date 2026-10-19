@@ -44,3 +44,9 @@ The ten branch sheets contain up to 27 columns A:AA. Daily status stores date, e
 - Workbook clarification: consolidation is an end-of-day copy of branch deputation; replace this with a query/view of submitted records, without copying rows into a second table. Keep draft vs submitted distinct.
 - Attendance is formula-based in the original workbook, so no Apps Script handoff is necessary. Reconstruct calculations from actual workbook formulas and reconcile against representative historical periods before finalizing paid days.
 - Supabase project is hosted in ap-northeast-1; consider regional latency from India when planning hosting but do not relocate without approval.
+
+## Production readiness decision — 2026-10-19
+- The connected Supabase project is currently empty. No migrations have been applied.
+- Migration 004's HO reopening RPC relies on function-owner privileges and trigger checks. It is **NOT APPROVED FOR APPLICATION** until tested under real Auth roles, including forged API calls, denied direct updates and audit preservation. Do not apply these draft migrations as-is simply because frontend CI passes.
+- Formal consolidation is a query over submitted engineer-days; no daily duplicate-copy table is required. Automated regression cases exercise branch filtering, exclusion of drafts and leave without service jobs.
+- Next release gates: audit and harden migrations, exercise RLS and RPC in a disposable environment, import a verified engineer roster, reconcile workbook attendance formulas, configure publishable key, and complete user-acceptance testing.
