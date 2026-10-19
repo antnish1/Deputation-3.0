@@ -37,3 +37,10 @@ The ten branch sheets contain up to 27 columns A:AA. Daily status stores date, e
 - **Not yet implemented:** HO review/approval of correction requests, re-opening and versioned adjustment records, final paid days, automatic holidays, cross-branch deputation, historical data import, and reconciliation.
 - **Release blocker:** RLS and SQL migrations have not been tested on an isolated database; no live database connection has been configured. Browser-only tests and CI builds cannot prove RLS behavior.
 - Supabase monthly queries now paginate in 500-row batches with a 100,000-row safety limit; validation with actual production-scale data remains necessary.
+
+## Connected database verification — 2026-10-19
+- Supabase project ref: `zvtaiaiatregbmidzchz` (Deputation 3.0, active/healthy).
+- Public schema inspection returned zero tables. No database DDL or deployment performed in this verification.
+- Workbook clarification: consolidation is an end-of-day copy of branch deputation; replace this with a query/view of submitted records, without copying rows into a second table. Keep draft vs submitted distinct.
+- Attendance is formula-based in the original workbook, so no Apps Script handoff is necessary. Reconstruct calculations from actual workbook formulas and reconcile against representative historical periods before finalizing paid days.
+- Supabase project is hosted in ap-northeast-1; consider regional latency from India when planning hosting but do not relocate without approval.
