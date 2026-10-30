@@ -8,6 +8,8 @@ const columns=[{letter:'C',label:'Engineer Name'},{letter:'D',label:'Workshop / 
 const workOptions:{value:DailyStatus;label:string}[]=[{value:'working',label:'Onsite'},{value:'workshop',label:'Workshop'},{value:'leave',label:'Leave'},{value:'absent',label:'Absent'},{value:'other',label:'Free'}];
 const callTypes=['U/W','B/W','ASC','P/T','JCB CARE','GOOD WILL VISIT'];
 const breakdownOptions=['Service','Running With Problem','Breakdown','Installation','PDI','Visit'];
+const isException=(s:DailyStatus)=>['leave','absent','other'].includes(s);
+const requiredKeys=['call_type','complaint','customer_name','contact_number','machine_number','hmr','breakdown_status','site_location'] as const;
 const display=(x:string)=>x.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
 const jobFrom=(j?:Job):Record<string,string>=>Object.fromEntries(keys.map(k=>[k,j?.[k]==null?'':String(j[k])]));
 const blank=(engineer_id:string,index:number):Entry=>({key:engineer_id+'-'+index,engineer_id,status:'working',job:jobFrom(),dirty:false});
@@ -22,12 +24,12 @@ export function DeputationGrid({supabase,engineers,days,jobs,branch,branchName,d
   for(const e of roster){
    const day=days.find(d=>d.engineer_id===e.id&&d.work_date===date);
    const related=day?jobs.filter(j=>j.day_id===day.id):[];
-   if(!related.length)result.push({...blank(e.id,0),status:day?.status||'working',existingDay:day});
+   if(!related.length)result.push({...blank(e.id,0),status:day?.status||'working',existingDay:day,job:{...jobFrom(),complaint:day?.remarks||''}});
    related.forEach((j,i)=>result.push({...blank(e.id,i),status:day!.status,existingDay:day,existingJob:j,job:jobFrom(j)}));
   }
   setEntries(result);
  },[roster,days,jobs,date]);
- const alter=(key:string,field:string,value:string)=>setEntries(p=>p.map(r=>r.key!==key?r:{...r,...(field==='status'?{status:value as DailyStatus}:{job:{...r.job,[field]:value}}),dirty:true}));
+ const alter=(key:string,field:string,value:string)=>setEntries(p=>p.map(r=>r.key!==key?r:{...r,...(field==='status'?{status:value as DailyStatus,job:isException(value as DailyStatus)?{...jobFrom(),complaint:r.job.complaint}:r.job}:{job:{...r.job,[field]:value}}),dirty:true}));
  const addJob=(e:Entry)=>setEntries(p=>{const same=p.filter(r=>r.engineer_id===e.engineer_id);return [...p.slice(0,p.findIndex(r=>r.key===same[same.length-1].key)+1),{...blank(e.engineer_id,Date.now()),status:e.status,existingDay:e.existingDay,dirty:true},...p.slice(p.findIndex(r=>r.key===same[same.length-1].key)+1)]});
  const save=async()=>{
   const changed=entries.filter(e=>e.dirty&&!e.existingDay?.submitted_at);
@@ -46,6 +48,7 @@ export function DeputationGrid({supabase,engineers,days,jobs,branch,branchName,d
    if(lookupError)throw new Error(lookupError.message);
    for(const e of changed){
     if(e.existingJob){notify('Existing service jobs are currently read-only. New rows and status changes were saved; use a correction request for submitted data.');continue;}
+    if(isException(e.status)){if(e.job.complaint.trim()){const dayId=dayRows?.find(d=>d.engineer_id===e.engineer_id)?.id;if(!dayId)throw new Error('Missing engineer record');const {error}=await supabase.from('daily_status').update({remarks:e.job.complaint}).eq('id',dayId);if(error)throw new Error(error.message)}continue;}
     if(!Object.values(e.job).some(v=>v.trim()))continue;
     const dayId=dayRows?.find(d=>d.engineer_id===e.engineer_id)?.id;
     if(!dayId)throw new Error('Missing engineer-day record');
@@ -57,7 +60,9 @@ export function DeputationGrid({supabase,engineers,days,jobs,branch,branchName,d
   }catch(e){notify(e instanceof Error?e.message:String(e))}finally{setSaving(false)}
  };
  const draftDays=days.filter(d=>d.branch_id===branch&&d.work_date===date&&!d.submitted_at);
+ const missing=entries.filter(e=>!e.existingDay?.submitted_at&&!isException(e.status)).filter(e=>requiredKeys.some(k=>!String(e.job[k]||'').trim()));
  const submitDay=async()=>{
+  if(missing.length){notify('Complete Call Type, Complaint, Customer, Contact, Machine, HMR, Breakdown Status and Site Location for all working rows. Call ID is optional.');setConfirmSubmit(false);return}
   if(entries.some(e=>e.dirty)){notify('Save your unsaved changes before submitting.');return}
   if(!draftDays.length)return;
   setSaving(true);
@@ -75,12 +80,12 @@ export function DeputationGrid({supabase,engineers,days,jobs,branch,branchName,d
   }catch(e){notify('Submission failed: '+(e instanceof Error?e.message:String(e)))}finally{setSaving(false)}
  };
  const shown=entries.filter(e=>(statusFilter==='all'||e.status===statusFilter)&&(!filter||roster.find(x=>x.id===e.engineer_id)?.name.toLowerCase().includes(filter.toLowerCase())));
- const input=(e:Entry,k:string,type='text')=><input aria-label={display(k)} disabled={!!e.existingDay?.submitted_at||!!e.existingJob} type={type} value={e.job[k]||''} onChange={ev=>alter(e.key,k,ev.target.value)}/>;
+ const input=(e:Entry,k:string,type='text')=><input aria-label={display(k)} disabled={!!e.existingDay?.submitted_at||!!e.existingJob||(isException(e.status)&&k!=='complaint')} type={type} value={e.job[k]||''} onChange={ev=>alter(e.key,k,ev.target.value)}/>;
  return <section className="gridPanel">
-  <div className="gridToolbar"><div><h2>Daily Deputation Register</h2><p>{branchName} · {date} · Compact register · original column references retained</p></div><div className="gridButtons"><span className="gridCount">{entries.filter(e=>e.dirty).length} unsaved rows</span><button disabled={saving||!entries.some(e=>e.dirty)} onClick={()=>void save()}>{saving?'Saving…':'Save Changes'}</button><button disabled={saving||!draftDays.length||entries.some(e=>e.dirty)} onClick={()=>setConfirmSubmit(true)}>Submit Daily Deputation ({draftDays.length})</button></div></div>
+  <div className="gridToolbar"><div><h2>Daily Deputation Register</h2><p>{branchName} · {date} · Compact register · original column references retained</p></div><div className="gridButtons"><span className="gridCount">{entries.filter(e=>e.dirty).length} unsaved rows</span><button disabled={saving||!entries.some(e=>e.dirty)} onClick={()=>void save()}>{saving?'Saving…':'Save Changes'}</button><button disabled={saving||!draftDays.length||entries.some(e=>e.dirty)} onClick={()=>{if(missing.length){notify(missing.length+' working rows have missing required fields. Complete them before submitting.');return}setConfirmSubmit(true)}}>Submit Daily Deputation ({draftDays.length})</button></div></div>
   {confirmSubmit&&<div className="submitConfirmation" role="alertdialog" aria-label="Confirm daily deputation submission"><strong>Submit {draftDays.length} saved records for {date}?</strong><span>Submitted records will be locked and included in Consolidation.</span><button disabled={saving} onClick={()=>void submitDay()}>Confirm Submission</button><button className="outline" disabled={saving} onClick={()=>setConfirmSubmit(false)}>Cancel</button></div>}
   <div className="gridFilters"><input placeholder="Find engineer…" value={filter} onChange={e=>setFilter(e.target.value)}/><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">All statuses</option>{workOptions.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</select><span>Scroll horizontally to view every column</span></div>
-  <div className="sheetScroll"><table className="sheetTable"><thead><tr>{columns.map((c,i)=><th key={c.letter} className={i===0?'stickyEngineer':''}><small>{c.letter}</small>{c.label}</th>)}<th>Actions</th></tr></thead><tbody>{shown.map(e=>{const engineer=roster.find(x=>x.id===e.engineer_id);const locked=!!e.existingDay?.submitted_at;return <tr key={e.key} className={locked?'sheetLocked':''}><td className="stickyEngineer">{engineer?.name||'Unknown'}</td><td><select disabled={locked} value={e.status} onChange={ev=>alter(e.key,'status',ev.target.value)}>{workOptions.map(status=><option key={status.value} value={status.value}>{status.label}</option>)}</select></td>{(['call_type','complaint','customer_name','contact_number','machine_number','hmr','breakdown_status','site_location','call_id'] as const).map(k=><td key={k}>{k==='call_type'||k==='breakdown_status'?<select aria-label={k==='call_type'?'Call Type':'Breakdown Status'} disabled={locked||!!e.existingJob} value={e.job[k]||''} onChange={ev=>alter(e.key,k,ev.target.value)}><option value="">Select</option>{(k==='call_type'?callTypes:breakdownOptions).map(option=><option key={option} value={option}>{option}</option>)}</select>:input(e,k,k==='hmr'?'number':'text')}</td>)}<td><button className="sheetAdd" disabled={locked} onClick={()=>addJob(e)}>+ Call</button></td></tr>})}</tbody></table></div>
+  <div className="sheetScroll"><table className="sheetTable"><thead><tr>{columns.map((c,i)=><th key={c.letter} className={i===0?'stickyEngineer':''}><small>{c.letter}</small>{c.label}</th>)}<th>Actions</th></tr></thead><tbody>{shown.map(e=>{const engineer=roster.find(x=>x.id===e.engineer_id);const locked=!!e.existingDay?.submitted_at;return <tr key={e.key} className={[locked?'sheetLocked':'',e.status==='leave'?'sheetLeave':'',e.status==='absent'?'sheetAbsent':'',e.status==='other'?'sheetFree':''].filter(Boolean).join(' ')}><td className="stickyEngineer">{engineer?.name||'Unknown'}</td><td><select disabled={locked} value={e.status} onChange={ev=>alter(e.key,'status',ev.target.value)}>{workOptions.map(status=><option key={status.value} value={status.value}>{status.label}</option>)}</select></td>{(['call_type','complaint','customer_name','contact_number','machine_number','hmr','breakdown_status','site_location','call_id'] as const).map(k=><td key={k}>{k==='call_type'||k==='breakdown_status'?<select aria-label={k==='call_type'?'Call Type':'Breakdown Status'} disabled={locked||!!e.existingJob||isException(e.status)} value={e.job[k]||''} onChange={ev=>alter(e.key,k,ev.target.value)}><option value="">Select</option>{(k==='call_type'?callTypes:breakdownOptions).map(option=><option key={option} value={option}>{option}</option>)}</select>:input(e,k,k==='hmr'?'number':'text')}</td>)}<td><button className="sheetAdd" disabled={locked||isException(e.status)} onClick={()=>addJob(e)}>+ Call</button></td></tr>})}</tbody></table></div>
   <p className="gridFoot">Existing submitted rows remain locked. Removed fields are retained in stored historical records; only the requested columns appear in this grid.</p>
  </section>
 }
