@@ -6,3 +6,5 @@
 
 /* Keep the sheet index visible without overlapping the Location and Engineer cells. */
 .sheetTable .stickyEngineer{position:static;min-width:190px}.sheetTable th.stickyEngineer{position:sticky;top:0;z-index:3}
+
+.submitConfirmation{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:14px 20px;background:#fff9e9;border-block:1px solid #f0dfb7}.submitConfirmation strong{color:#725315}.submitConfirmation span{color:#7c705f;font-size:12px;margin-right:auto}
