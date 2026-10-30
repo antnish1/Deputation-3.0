@@ -16,7 +16,7 @@ const timePart=(date:string|null|undefined)=>date?.slice(11,16)||'';
 const toIso=(d:string,t:string)=>d&&t?new Date(d+'T'+t+':00').toISOString():null;
 export function DeputationGrid({supabase,engineers,days,jobs,branch,branchName,date,onReload,notify}:{supabase:SupabaseClient;engineers:Engineer[];days:Day[];jobs:Job[];branch:string;branchName:string;date:string;onReload:()=>Promise<void>;notify:(s:string)=>void}){
  const roster=useMemo(()=>engineers.filter(e=>e.home_branch_id===branch),[engineers,branch]);
- const [entries,setEntries]=useState<Entry[]>([]),[saving,setSaving]=useState(false),[filter,setFilter]=useState(''),[statusFilter,setStatusFilter]=useState('all');
+ const [entries,setEntries]=useState<Entry[]>([]),[saving,setSaving]=useState(false),[confirmSubmit,setConfirmSubmit]=useState(false),[filter,setFilter]=useState(''),[statusFilter,setStatusFilter]=useState('all');
  useEffect(()=>{
   const result:Entry[]=[];
   for(const e of roster){
@@ -56,10 +56,29 @@ export function DeputationGrid({supabase,engineers,days,jobs,branch,branchName,d
    notify('Spreadsheet entries saved.');await onReload();
   }catch(e){notify(e instanceof Error?e.message:String(e))}finally{setSaving(false)}
  };
+ const draftDays=days.filter(d=>d.branch_id===branch&&d.work_date===date&&!d.submitted_at);
+ const submitDay=async()=>{
+  if(entries.some(e=>e.dirty)){notify('Save your unsaved changes before submitting.');return}
+  if(!draftDays.length)return;
+  setSaving(true);
+  try{
+   const {data:{user},error:authError}=await supabase.auth.getUser();
+   if(authError||!user)throw new Error('Session expired. Sign in again.');
+   let completed=0;
+   for(const day of draftDays){
+    const {data,error}=await supabase.from('daily_status').update({submitted_at:new Date().toISOString(),submitted_by:user.id}).eq('id',day.id).is('submitted_at',null).select('id');
+    if(error)throw new Error(error.message);
+    completed+=(data||[]).length;
+   }
+   notify(completed+' deputation records submitted. Open Consolidation to view them.');
+   setConfirmSubmit(false);await onReload();
+  }catch(e){notify('Submission failed: '+(e instanceof Error?e.message:String(e)))}finally{setSaving(false)}
+ };
  const shown=entries.filter(e=>(statusFilter==='all'||e.status===statusFilter)&&(!filter||roster.find(x=>x.id===e.engineer_id)?.name.toLowerCase().includes(filter.toLowerCase())));
  const input=(e:Entry,k:string,type='text')=><input aria-label={display(k)} disabled={!!e.existingDay?.submitted_at||!!e.existingJob} type={type} value={e.job[k]||''} onChange={ev=>alter(e.key,k,ev.target.value)}/>;
  return <section className="gridPanel">
-  <div className="gridToolbar"><div><h2>Daily Deputation Register</h2><p>{branchName} · {date} · Compact register · original column references retained</p></div><div className="gridButtons"><span className="gridCount">{entries.filter(e=>e.dirty).length} unsaved rows</span><button disabled={saving||!entries.some(e=>e.dirty)} onClick={()=>void save()}>{saving?'Saving…':'Save Changes'}</button></div></div>
+  <div className="gridToolbar"><div><h2>Daily Deputation Register</h2><p>{branchName} · {date} · Compact register · original column references retained</p></div><div className="gridButtons"><span className="gridCount">{entries.filter(e=>e.dirty).length} unsaved rows</span><button disabled={saving||!entries.some(e=>e.dirty)} onClick={()=>void save()}>{saving?'Saving…':'Save Changes'}</button><button disabled={saving||!draftDays.length||entries.some(e=>e.dirty)} onClick={()=>setConfirmSubmit(true)}>Submit Daily Deputation ({draftDays.length})</button></div></div>
+  {confirmSubmit&&<div className="submitConfirmation" role="alertdialog" aria-label="Confirm daily deputation submission"><strong>Submit {draftDays.length} saved records for {date}?</strong><span>Submitted records will be locked and included in Consolidation.</span><button disabled={saving} onClick={()=>void submitDay()}>Confirm Submission</button><button className="outline" disabled={saving} onClick={()=>setConfirmSubmit(false)}>Cancel</button></div>}
   <div className="gridFilters"><input placeholder="Find engineer…" value={filter} onChange={e=>setFilter(e.target.value)}/><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">All statuses</option>{workOptions.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</select><span>Scroll horizontally to view every column</span></div>
   <div className="sheetScroll"><table className="sheetTable"><thead><tr>{columns.map((c,i)=><th key={c.letter} className={i===0?'stickyEngineer':''}><small>{c.letter}</small>{c.label}</th>)}<th>Actions</th></tr></thead><tbody>{shown.map(e=>{const engineer=roster.find(x=>x.id===e.engineer_id);const locked=!!e.existingDay?.submitted_at;return <tr key={e.key} className={locked?'sheetLocked':''}><td className="stickyEngineer">{engineer?.name||'Unknown'}</td><td><select disabled={locked} value={e.status} onChange={ev=>alter(e.key,'status',ev.target.value)}>{workOptions.map(status=><option key={status.value} value={status.value}>{status.label}</option>)}</select></td>{(['call_type','complaint','customer_name','contact_number','machine_number','hmr','breakdown_status','site_location','call_id'] as const).map(k=><td key={k}>{k==='call_type'||k==='breakdown_status'?<select aria-label={k==='call_type'?'Call Type':'Breakdown Status'} disabled={locked||!!e.existingJob} value={e.job[k]||''} onChange={ev=>alter(e.key,k,ev.target.value)}><option value="">Select</option>{(k==='call_type'?callTypes:breakdownOptions).map(option=><option key={option} value={option}>{option}</option>)}</select>:input(e,k,k==='hmr'?'number':'text')}</td>)}<td><button className="sheetAdd" disabled={locked} onClick={()=>addJob(e)}>+ Call</button></td></tr>})}</tbody></table></div>
   <p className="gridFoot">Existing submitted rows remain locked. Removed fields are retained in stored historical records; only the requested columns appear in this grid.</p>
