@@ -8,3 +8,7 @@
 .sheetTable .stickyEngineer{position:static;min-width:190px}.sheetTable th.stickyEngineer{position:sticky;top:0;z-index:3}
 
 .submitConfirmation{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:14px 20px;background:#fff9e9;border-block:1px solid #f0dfb7}.submitConfirmation strong{color:#725315}.submitConfirmation span{color:#7c705f;font-size:12px;margin-right:auto}
+
+.sheetTable tr.sheetLeave td{background:#f1f5ff}.sheetTable tr.sheetAbsent td{background:#fff2f1}.sheetTable tr.sheetFree td{background:#f3f7f5}.sheetTable tr.sheetLeave:hover td{background:#eaf0ff}.sheetTable tr.sheetAbsent:hover td{background:#ffeae7}.sheetTable tr.sheetFree:hover td{background:#edf4ef}
+
+.adminWorkspace{display:grid;gap:20px}.adminFields{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:14px;margin:18px 0}.adminActions{display:flex;align-items:end;margin:13px 0 20px}.adminFields .adminActions{margin:0}@media(max-width:850px){.adminFields{grid-template-columns:repeat(2,1fr)}}@media(max-width:550px){.adminFields{grid-template-columns:1fr}}.sheetTable tr.sheetLeave td{background:#f0f5ff}.sheetTable tr.sheetAbsent td{background:#fff1ef}.sheetTable tr.sheetFree td{background:#f1f6f3}
