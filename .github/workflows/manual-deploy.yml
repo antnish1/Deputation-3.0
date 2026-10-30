@@ -1,0 +1,88 @@
+name: Deploy Deputation 3.0 (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Branch or commit to deploy"
+        required: true
+        default: "feat/phase1-deputation-consolidation-attendance"
+        type: string
+      environment:
+        description: "Deployment target"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - preview
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deputation-3-manual-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Manual Vercel deployment
+    runs-on: ubuntu-latest
+    environment: deputation-deployment
+    steps:
+      - name: Check deployment credentials
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::Set VERCEL_TOKEN in repository Actions secrets."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install and verify application
+        run: |
+          npm install --no-audit --no-fund
+          npm run test
+          npm run typecheck
+          npm run build
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Download Vercel environment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_DsOUqnF8Pbd7YGNt8RCE8NgA
+          VERCEL_PROJECT_ID: prj_ppPJDrY2sJjNfunRpdQpTjgcgOdk
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          else
+            vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          fi
+      - name: Build with Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_DsOUqnF8Pbd7YGNt8RCE8NgA
+          VERCEL_PROJECT_ID: prj_ppPJDrY2sJjNfunRpdQpTjgcgOdk
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel build --prod --token="$VERCEL_TOKEN"
+          else
+            vercel build --token="$VERCEL_TOKEN"
+          fi
+      - name: Deploy only on manual invocation
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_DsOUqnF8Pbd7YGNt8RCE8NgA
+          VERCEL_PROJECT_ID: prj_ppPJDrY2sJjNfunRpdQpTjgcgOdk
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          else
+            vercel deploy --prebuilt --token="$VERCEL_TOKEN"
+          fi
