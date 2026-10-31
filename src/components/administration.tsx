@@ -8,7 +8,7 @@ export function Administration({supabase,branches,engineers,reload,notify}:{supa
  const api=useCallback(async (payload:Record<string,unknown>)=>{
   const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error('Sign in required');
   const {data,error}=await supabase.functions.invoke('branch-user-admin',{body:payload});
-  if(error)throw new Error(error.message);
+  if(error){const response=(error as {context?:Response}).context;let detail='';if(response?.json){try{const body=await response.json();detail=String(body?.error||body?.message||'')}catch{}}throw new Error(detail||error.message)}
   if(data?.error)throw new Error(data.error);
   return data;
  },[supabase]);
